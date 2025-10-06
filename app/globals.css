@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
+/* Brand tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-ink: #1a1a1a;
+  --color-ink-2: #333333;
+  --color-paper: #f7f6f3;
+  --color-muted: #d1d3d4;
+  --color-warm: #ffebd3;
+  --color-primary: #de5e48;   /* ORANGE (primary accent) */
+  --color-secondary: #5cafc1; /* TEAL (secondary) */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body, #__next { height: 100%; }
+
+/* Orange text selection */
+::selection { background: var(--color-primary); color: white; }
+
+/* Subtle scrollbars */
+* { scrollbar-width: thin; }
+*::-webkit-scrollbar { height: 8px; width: 8px; }
+*::-webkit-scrollbar-thumb { background-color: #d1d3d4; border-radius: 9999px; }
+
+@keyframes hueSweep {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(15deg); }
+}
+.hero-sheen {
+  animation: hueSweep 6s ease-in-out infinite alternate;
+}
+/* gradient text for "Always Available" */
+.gradient-text {
+  background: linear-gradient(90deg, var(--color-ink) 0%, var(--color-primary) 40%, var(--color-secondary) 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-flow 6s ease-in-out infinite alternate;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
   }
 }
+/* Global app background: warm gradient + subtle dotted grid */
+body.app-bg {
+  position: relative;
+}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+body.app-bg::before,
+body.app-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+body.app-bg::before {
+  z-index: -2;
+  /* same gradient you liked */
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(222,94,72,0.12), transparent 60%),
+    radial-gradient(900px 500px at 80% 10%, rgba(92,175,193,0.10), transparent 60%),
+    linear-gradient(180deg, #fff 0%, #fff6 10%, #ffedd5 55%, #fff 100%);
+}
+
+body.app-bg::after {
+  z-index: -1;
+  opacity: 0.12;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 18px 18px;
+  color: var(--color-muted);
 }
