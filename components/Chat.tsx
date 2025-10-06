@@ -61,19 +61,36 @@ export default function Chat() {
     const decoder = new TextDecoder();
 
     let done = false;
-    while (!done) {
-      const { value, done: d } = await reader.read();
-      done = d;
-      if (value) {
-        const chunk = decoder.decode(value);
-        setMessages((prev) => {
-          const next = [...prev];
-          const last = next[next.length - 1];
-          if (last?.role === "assistant") last.content += chunk;
-          return next;
-        });
-      }
+     let buffer = "";
+
+while (!done) {
+  const { value, done: d } = await reader.read();
+  done = d;
+  if (value) {
+    buffer += decoder.decode(value, { stream: true });
+
+    // Split on newlines or stream delimiters if your API uses them
+    const segments = buffer.split("\n\n");
+    buffer = segments.pop()!; // keep the unfinished part
+
+    for (const segment of segments) {
+      const text = segment.trim();
+      if (!text) continue;
+
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+
+        // Append only *new* tokens
+        if (last?.role === "assistant") {
+          last.content = (last.content + " " + text).replace(/\s+/g, " ");
+        }
+        return next;
+      });
     }
+  }
+}
+
 
     setIsStreaming(false);
   }
