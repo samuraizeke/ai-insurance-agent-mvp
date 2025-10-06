@@ -1,7 +1,14 @@
 "use client";
 import { useState } from "react";
+import type { PolicyFile } from "@/lib/types";
 
-export default function FileDropzone({ onUploaded }: { onUploaded: (policy: any) => void }) {
+type Props = {
+  onUploaded: (policy: PolicyFile) => void;
+};
+
+type UploadResponse = { ok: true; policy: PolicyFile } | { ok?: false; error: string };
+
+export default function FileDropzone({ onUploaded }: Props) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,11 +19,15 @@ export default function FileDropzone({ onUploaded }: { onUploaded: (policy: any)
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Upload failed");
+      const data: UploadResponse = await res.json();
+
+      if (!res.ok || !("ok" in data && data.ok)) {
+        throw new Error(("error" in data && data.error) ? data.error : "Upload failed");
+      }
       onUploaded(data.policy);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      setError(msg);
     } finally {
       setIsUploading(false);
     }
