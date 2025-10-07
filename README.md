@@ -34,3 +34,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deploy on Azure App Service
+
+This project is configured to emit a [standalone Next.js build](https://nextjs.org/docs/app/building-your-application/deploying/standalone) so it can be zipped and deployed through the Azure App Service GitHub Action workflow without any custom App Service settings.
+
+If your App Service already runs on the Node 18 LTS (or newer) runtime stack, no additional configuration changes are required after this update—the action continues to publish the build artifacts and the default startup command (`npm start`) keeps working.
+
+Only adjust your App Service settings if you need to:
+
+- upgrade the runtime stack to Node 18+ (required by Next.js 15)
+- provide environment variables for your Azure OpenAI or other integrations
+
+Otherwise, the deployment pipeline works with the default App Service configuration.
