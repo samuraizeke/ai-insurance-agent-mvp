@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Chat from "@/components/Chat";
+import { db } from "@/lib/db";
 import Button from "@/components/ui/Button";
 import Link from "next/link";
 
@@ -49,7 +50,7 @@ export default function ChatPage() {
         className="relative mx-auto mt-8 flex w-full max-w-5xl flex-1 flex-col rounded-3xl border border-[var(--color-muted)] bg-white shadow-sm md:mt-12"
         style={{ minHeight: "80vh" }}
       >
-        <Chat />
+        <Chat initialPolicy={db.profile.policy ?? null} />
       </motion.section>
     </div>
   );
