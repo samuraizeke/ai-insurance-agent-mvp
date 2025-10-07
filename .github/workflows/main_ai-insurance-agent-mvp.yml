@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  APP_NAME: ai-insurance-agent-mvp          # <-- exact Web App name (matches your screenshot)
+  RESOURCE_GROUP: ai-insurance-agent-mvp # <-- fill in your Azure resource group name
+
 jobs:
   package:
     runs-on: ubuntu-latest
@@ -15,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Create a lean zip of your app source. Azure (Oryx) will install deps and build.
+      # Create a lean zip of your app source; Azure (Oryx) will install deps & build
       - name: Create deployment zip (source only)
         run: |
           rm -f app-source.zip
@@ -41,15 +45,28 @@ jobs:
         with:
           name: app-source
 
-      - name: Azure login
+      - name: Azure login (federated)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_72B7DD5ACED1414F8BD4C6F9C0EC5E53 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_42FB4EE03C8D42498B926FAB425ABE20 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E479F1FA3D73423398FB8D67F3EFAEE1 }}
 
-      - name: Deploy to Azure Web App (zip)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ai-insurance-agent-mvp
-          package: app-source.zip
+      - name: Stop app (avoid 409 locks)
+        run: az webapp stop -g "$RESOURCE_GROUP" -n "$APP_NAME"
+
+      # Force ZIP DEPLOY via CLI (not OneDeploy)
+      - name: Deploy (zipDeploy via CLI)
+        run: |
+          az webapp deploy \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$APP_NAME" \
+            --type zip \
+            --src-path app-source.zip
+
+      - name: Start app
+        run: az webapp start -g "$RESOURCE_GROUP" -n "$APP_NAME"
+
+      - name: Show latest deployment log URL
+        run: az webapp log deployment show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query "log_url" -o tsv
+
