@@ -1,197 +1,214 @@
+// components/Chat.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, PolicyFile } from "@/lib/types";
-import { Paperclip } from "lucide-react";
-import Button from "@/components/ui/Button";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
-type UploadResponse = { ok: true; policy: PolicyFile } | { ok?: false; error: string };
-
-function safeUUID(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
+type Role = "user" | "assistant" | "system";
+type ChatMsg = { id: string; role: Role; content: string; createdAt: number };
 
 export default function Chat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [policyText, setPolicyText] = useState<string | undefined>(undefined);
-  const [policyCard, setPolicyCard] = useState<PolicyFile | null>(null);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const latestAssistantIdRef = useRef<string | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
 
+  // Auto-scroll on new messages
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isStreaming]);
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  async function send(text: string) {
-    const id = safeUUID();
-    const userMsg: ChatMessage = { id, role: "user", content: text, createdAt: Date.now() };
+  const sendMessage = useCallback(async () => {
+    const text = input.trim();
+    if (!text || isStreaming) return;
 
-    setMessages((prev) => [
-      ...prev,
-      userMsg,
-      { id: id + "-assistant", role: "assistant", content: "", createdAt: Date.now() },
-    ]);
+    // Cancel any previous stream
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
 
+    const userId = crypto.randomUUID();
+    const assistantId = crypto.randomUUID();
+    latestAssistantIdRef.current = assistantId;
+
+    // 1) Push user message
+    const userMsg: ChatMsg = {
+      id: userId,
+      role: "user",
+      content: text,
+      createdAt: Date.now(),
+    };
+
+    // 2) Create ONE assistant placeholder for streaming updates
+    const assistantPlaceholder: ChatMsg = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      createdAt: Date.now(),
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantPlaceholder]);
+    setInput("");
     setIsStreaming(true);
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: messages.concat(userMsg).map(({ role, content }) => ({ role, content })),
-        policyText,
-      }),
-    });
+    try {
+      const payload = {
+        messages: [...messages, userMsg]
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role, content: m.content })),
+      };
 
-    if (!res.ok || !res.body) {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        signal: abortRef.current.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok || !res.body) {
+        const errText = await safeJsonError(res);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: `AI error: ${errText}` } : m
+          )
+        );
+        setIsStreaming(false);
+        return;
+      }
+
+      // Stream the plain text response
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffered = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+
+        buffered += chunk;
+
+        // Update the existing assistant placeholder
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: buffered } : m))
+        );
+      }
+
+      setIsStreaming(false);
+    } catch (err: unknown) {
+      if ((err as any)?.name === "AbortError") return;
+      const msg =
+        err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
       setMessages((prev) =>
-        prev.slice(0, -1).concat({
-          id: id + "-assistant-error",
-          role: "assistant",
-          content: "Sorry, I couldn’t reach the AI service.",
-          createdAt: Date.now(),
-        }),
+        prev.map((m) =>
+          m.id === latestAssistantIdRef.current ? { ...m, content: `AI error: ${msg}` } : m
+        )
       );
       setIsStreaming(false);
-      return;
     }
+  }, [input, isStreaming, messages]);
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let done = false;
-    let buffer = "";
-
-    while (!done) {
-      const { value, done: d } = await reader.read();
-      done = d;
-      if (value) {
-        buffer += decoder.decode(value, { stream: true });
-
-        const segments = buffer.split("\n\n");
-        buffer = segments.pop() ?? "";
-
-        for (const seg of segments) {
-          const textPart = seg.trim();
-          if (!textPart) continue;
-          setMessages((prev) => {
-            const next = [...prev];
-            const last = next[next.length - 1];
-            if (last?.role === "assistant") {
-              last.content = (last.content + " " + textPart).replace(/\s+/g, " ");
-            }
-            return next;
-          });
-        }
-      }
+  // Enter = send, Shift+Enter = newline
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
-
-    setIsStreaming(false);
-  }
-
-  async function onFileChosen(file: File) {
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data: UploadResponse = await res.json();
-      if (!res.ok || !("ok" in data && data.ok)) {
-        throw new Error(("error" in data && data.error) ? data.error : "Upload failed");
-      }
-      setPolicyCard(data.policy);
-      setPolicyText(`Policy file available at: ${data.policy.storedAt}`);
-    } catch (e) {
-      // swallow for now; you can toast here
-      console.error(e);
-    }
-  }
+  };
 
   return (
-    <div className="flex h-[80vh] flex-col md:h-[85vh]">
-      <div className="relative flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-4">
-          {messages.map((m) => {
-            const isUser = m.role === "user";
-            return (
-              <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={[
-                    "max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-[0.95rem] shadow-sm",
-                    isUser
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "bg-white text-[var(--color-ink)] border border-[var(--color-muted)]",
-                  ].join(" ")}
-                >
-                  {m.content}
-                </div>
-              </div>
-            );
-          })}
-          {isStreaming && <div className="text-center text-xs text-[var(--color-ink-2)]">Agent is typing…</div>}
-          <div ref={bottomRef} />
-        </div>
+    <div className="mx-auto flex h-[calc(100vh-8rem)] w-full max-w-5xl flex-col rounded-2xl bg-white/70 p-4 shadow-xl backdrop-blur lg:h-[calc(100vh-6rem)]">
+      <div className="mb-3 text-center text-sm text-gray-500">
+        Chat with your AI Insurance Agent
       </div>
 
-      <div className="border-t border-[var(--color-muted)] bg-white/90 p-3 backdrop-blur">
-        <div className="mx-auto w-full max-w-3xl">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-xs text-[var(--color-ink-2)]">
-              {policyCard ? (
-                <>
-                  Policy on file:{" "}
-                  <a className="text-[var(--color-primary)] underline-offset-4 hover:underline" href={policyCard.storedAt} target="_blank">
-                    {policyCard.name}
-                  </a>
-                </>
-              ) : (
-                <span className="opacity-80">Attach a policy for smarter answers</span>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--color-muted)] bg-white px-3 py-1.5 text-xs text-[var(--color-ink)] hover:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
-            >
-              <Paperclip className="h-4 w-4" />
-              Attach
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onFileChosen(f);
-              }}
-            />
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.currentTarget as HTMLFormElement;
-              const textarea = form.elements.namedItem("message") as HTMLTextAreaElement;
-              const v = textarea.value.trim();
-              if (!v) return;
-              void send(v);
-              textarea.value = "";
-            }}
-            className="flex items-end gap-2"
-          >
-            <textarea
-              name="message"
-              rows={1}
-              placeholder="Type your message…"
-              className="min-h-[44px] flex-1 resize-none rounded-xl border border-[var(--color-muted)] bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-            />
-            <Button type="submit" variant="primary" size="md">
-              Send
-            </Button>
-          </form>
-        </div>
+      <div className="flex-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
+        {messages.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <ul className="space-y-4">
+            {messages.map((m) => (
+              <MessageBubble key={m.id} msg={m} />
+            ))}
+          </ul>
+        )}
+        <div ref={endRef} />
       </div>
+
+      <form
+        className="mt-3 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          sendMessage();
+        }}
+      >
+        <textarea
+          className="min-h-[52px] max-h-40 flex-1 resize-y rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none ring-0 focus:border-primary"
+          placeholder="Ask about your coverage… (Shift+Enter for newline)"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          disabled={isStreaming}
+          rows={2}
+        />
+        <button
+          type="submit"
+          disabled={isStreaming || !input.trim()}
+          className="self-end rounded-xl bg-primary px-5 py-3 font-medium text-white disabled:opacity-60"
+        >
+          {isStreaming ? "Sending…" : "Send"}
+        </button>
+      </form>
     </div>
   );
+}
+
+function MessageBubble({ msg }: { msg: ChatMsg }) {
+  const isUser = msg.role === "user";
+
+  return (
+    <li className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div className={`flex max-w-[85%] items-start gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
+        {/* Avatar */}
+        <span
+          className={`mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+            isUser ? "text-white" : "bg-gray-200 text-gray-700"
+          }`}
+          style={isUser ? { backgroundColor: "var(--color-secondary)" } : {}}
+          aria-hidden
+        >
+          {isUser ? "U" : "AI"}
+        </span>
+
+        {/* Bubble */}
+        <div
+          className={`whitespace-pre-wrap leading-relaxed px-4 py-3 shadow-sm rounded-2xl ${
+            isUser ? "text-white" : "bg-gray-100 text-gray-900"
+          } ${isUser ? "rounded-br-md" : "rounded-bl-md"}`}
+          style={isUser ? { backgroundColor: "var(--color-secondary)" } : {}}
+        >
+          {msg.content}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex h-full items-center justify-center text-gray-400">
+      Start by asking a question about home or auto coverage.
+    </div>
+  );
+}
+
+async function safeJsonError(res: Response): Promise<string> {
+  try {
+    const j = await res.json();
+    const inner = j?.error?.message ?? j?.error ?? j;
+    return typeof inner === "string" ? inner : JSON.stringify(inner);
+  } catch {
+    return `${res.status} ${res.statusText}`;
+  }
 }

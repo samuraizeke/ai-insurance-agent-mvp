@@ -5,13 +5,15 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "ingest": "NODE_OPTIONS=\"--max-old-space-size=4096 --expose-gc\" DOTENV_CONFIG_PATH=.env.local tsx scripts/ingest.ts"
   },
   "dependencies": {
+    "@pinecone-database/pinecone": "^6.1.2",
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.544.0",
     "next": "15.5.4",
-    "openai": "^6.1.0",
+    "openai": "^6.2.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "uuid": "^13.0.0",
@@ -24,9 +26,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "tailwindcss": "^4.1.14",
-    "typescript": "^5"
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,11 +1,24 @@
-import OpenAI from "openai";
+// lib/openai.ts
+import { AzureOpenAI } from "openai";
 
-export function getOpenAI() {
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) throw new Error("Missing OPENAI_API_KEY env.");
-return new OpenAI({ apiKey });
+function need(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v;
 }
 
-export function getModel() {
-return process.env.AI_MODEL || "gpt-5"; // change to any available model
+export function getAzureChatClient() {
+  const endpoint     = need("AZURE_OPENAI_ENDPOINT");           // e.g., https://...azure.com/
+  const apiKey       = need("AZURE_OPENAI_API_KEY");
+  const apiVersion   = process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview";
+  const deployment   = need("AZURE_OPENAI_DEPLOYMENT");         // <-- DEPLOYMENT NAME
+
+  const client = new AzureOpenAI({
+    endpoint,
+    apiKey,
+    apiVersion,
+    // NOTE: for Chat Completions you do NOT pass deployment here; you pass it as "model" per call.
+  });
+
+  return { client, deployment };
 }
