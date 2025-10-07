@@ -7,5 +7,5 @@ return new OpenAI({ apiKey });
 }
 
 export function getModel() {
-return process.env.AI_MODEL || "gpt-4o-mini"; // change to any available model
+return process.env.AI_MODEL || "gpt-5"; // change to any available model
 }
