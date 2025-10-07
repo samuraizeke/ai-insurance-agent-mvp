@@ -1,72 +1,59 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
 name: Build and deploy Node.js app to Azure Web App - ai-insurance-agent-mvp
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
-env:
-  APP_NAME: ai-insurance-agent-mvp          # <-- exact Web App name (matches your screenshot)
-  RESOURCE_GROUP: ai-insurance-agent-mvp # <-- fill in your Azure resource group name
-
 jobs:
-  package:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: read #This is required for actions/checkout
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Create a lean zip of your app source; Azure (Oryx) will install deps & build
-      - name: Create deployment zip (source only)
-        run: |
-          rm -f app-source.zip
-          zip -r app-source.zip . \
-            -x ".git/*" ".github/*" "node_modules/*" ".next/*" "out_azure/*"
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
 
-      - name: Upload artifact
+      - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: app-source
-          path: app-source.zip
+          name: node-app
+          path: .
 
   deploy:
     runs-on: ubuntu-latest
-    needs: package
+    needs: build
     permissions:
-      id-token: write
-      contents: read
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
 
     steps:
-      - name: Download artifact
+      - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: app-source
-
-      - name: Azure login (federated)
+          name: node-app
+      
+      - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_72B7DD5ACED1414F8BD4C6F9C0EC5E53 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_42FB4EE03C8D42498B926FAB425ABE20 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E479F1FA3D73423398FB8D67F3EFAEE1 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_2171C66EB5484ACEB6F0090E5D56C11D }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5C0901E9E11842B286DB42C7B837855F }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1E9B956CFED24A03A602D86FA3616203 }}
 
-      - name: Stop app (avoid 409 locks)
-        run: az webapp stop -g "$RESOURCE_GROUP" -n "$APP_NAME"
-
-      # Force ZIP DEPLOY via CLI (not OneDeploy)
-      - name: Deploy (zipDeploy via CLI)
-        run: |
-          az webapp deploy \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$APP_NAME" \
-            --type zip \
-            --src-path app-source.zip
-
-      - name: Start app
-        run: az webapp start -g "$RESOURCE_GROUP" -n "$APP_NAME"
-
-      - name: Show latest deployment log URL
-        run: az webapp log deployment show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query "log_url" -o tsv
-
+      - name: 'Deploy to Azure Web App'
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'ai-insurance-agent-mvp'
+          slot-name: 'Production'
+          package: .
+          
