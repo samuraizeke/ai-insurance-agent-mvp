@@ -139,7 +139,6 @@ export async function POST(req: NextRequest) {
       model: azure.deployment,
       messages,
       stream: true,
-      temperature: 0.7,
     });
 
     const encoder = new TextEncoder();
