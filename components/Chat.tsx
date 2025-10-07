@@ -3,6 +3,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Download, Eye, Loader2, Send } from "lucide-react";
+
 import FileDropzone from "@/components/FileDropzone";
 import { fmt } from "@/lib/utils";
 import type { PolicyFile } from "@/lib/types";
@@ -160,14 +162,27 @@ export default function Chat({ initialPolicy = null }: ChatProps) {
               <div>{policySummary}</div>
             </div>
             {policy?.storedAt ? (
-              <a
-                className="text-sm font-medium text-[var(--color-primary)] underline"
-                href={policy.storedAt}
-                target="_blank"
-                rel="noreferrer"
-              >
-                View / Download
-              </a>
+              <div className="flex items-center gap-3">
+                <a
+                  className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[var(--color-primary)] text-[var(--color-primary)] transition hover:bg-[var(--color-primary)] hover:text-white"
+                  href={policy.storedAt}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="View policy"
+                  aria-label="View policy"
+                >
+                  <Eye className="h-5 w-5" aria-hidden />
+                </a>
+                <a
+                  className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[var(--color-primary)] text-[var(--color-primary)] transition hover:bg-[var(--color-primary)] hover:text-white"
+                  href={policy.storedAt}
+                  download
+                  title="Download policy"
+                  aria-label="Download policy"
+                >
+                  <Download className="h-5 w-5" aria-hidden />
+                </a>
+              </div>
             ) : null}
           </div>
         </div>
@@ -197,6 +212,21 @@ export default function Chat({ initialPolicy = null }: ChatProps) {
             ))}
           </ul>
         )}
+        {isStreaming ? (
+          <div
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600"
+            title="AI assistant is typing"
+            aria-live="polite"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            <span className="typing-dots" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="sr-only">AI assistant is typing</span>
+          </div>
+        ) : null}
         <div ref={endRef} />
       </div>
 
@@ -219,9 +249,15 @@ export default function Chat({ initialPolicy = null }: ChatProps) {
         <button
           type="submit"
           disabled={isStreaming || !input.trim()}
-          className="self-end rounded-xl bg-primary px-5 py-3 font-medium text-white disabled:opacity-60"
+          className="self-end cursor-pointer rounded-xl bg-primary p-3 text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          title="Send message"
+          aria-label="Send message"
         >
-          {isStreaming ? "Sending…" : "Send"}
+          {isStreaming ? (
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+          ) : (
+            <Send className="h-5 w-5" aria-hidden />
+          )}
         </button>
       </form>
     </div>
