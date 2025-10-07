@@ -1,18 +1,34 @@
 // components/Chat.tsx
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import FileDropzone from "@/components/FileDropzone";
+import { fmt } from "@/lib/utils";
+import type { PolicyFile } from "@/lib/types";
 
 type Role = "user" | "assistant" | "system";
 type ChatMsg = { id: string; role: Role; content: string; createdAt: number };
 
-export default function Chat() {
+type ChatProps = {
+  initialPolicy?: PolicyFile | null;
+};
+
+export default function Chat({ initialPolicy = null }: ChatProps) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [policy, setPolicy] = useState<PolicyFile | null>(initialPolicy);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const latestAssistantIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!uploadStatus) return;
+    const timeout = window.setTimeout(() => setUploadStatus(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [uploadStatus]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -117,10 +133,58 @@ export default function Chat() {
     }
   };
 
+  const policySummary = useMemo(() => {
+    if (!policy) {
+      return "No policy on file yet.";
+    }
+
+    const details = [
+      `Name: ${policy.name}`,
+      policy.mime ? `Type: ${policy.mime}` : null,
+      `Size: ${Math.round(policy.size / 1024)} KB`,
+      `Uploaded: ${fmt.date(policy.uploadedAt)}`,
+    ].filter(Boolean);
+
+    return details.join(" • ");
+  }, [policy]);
+
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] w-full max-w-5xl flex-col rounded-2xl bg-white/70 p-4 shadow-xl backdrop-blur lg:h-[calc(100vh-6rem)]">
-      <div className="mb-3 text-center text-sm text-gray-500">
-        Chat with your AI Insurance Agent
+      <div className="mb-3 text-center text-sm text-gray-500">Chat with your AI Insurance Agent</div>
+
+      <div className="mb-4 space-y-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-medium text-gray-900">Policy on file</div>
+              <div>{policySummary}</div>
+            </div>
+            {policy?.storedAt ? (
+              <a
+                className="text-sm font-medium text-[var(--color-primary)] underline"
+                href={policy.storedAt}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View / Download
+              </a>
+            ) : null}
+          </div>
+        </div>
+
+        <FileDropzone
+          onUploaded={(uploaded) => {
+            setPolicy(uploaded);
+            setUploadStatus(`Policy “${uploaded.name}” saved to your profile.`);
+          }}
+          title={policy ? "Replace your policy" : "Upload your policy"}
+          description={
+            policy
+              ? "Upload a new policy file to keep the AI assistant up to date."
+              : "Drag & drop or choose a file (PDF, DOCX, images)."
+          }
+        />
+        {uploadStatus ? <div className="text-sm text-green-600">{uploadStatus}</div> : null}
       </div>
 
       <div className="flex-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
