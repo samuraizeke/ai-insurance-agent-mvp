@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
       systemPrompt?: unknown;
       useRag?: boolean;
       debug?: boolean;
+      maxTokens?: number;       // optional override from client
+      autoContinue?: boolean;   // default true
     };
 
     const raw: InMsg[] = Array.isArray(body?.messages) ? body.messages! : [];
@@ -56,8 +58,10 @@ export async function POST(req: NextRequest) {
       if (lastUser?.content?.trim()) {
         const { context } = await retrieveContext(lastUser.content.trim(), 6);
         if (context) {
+          // keep context reasonable to avoid hitting context window
+          const trimmed = context.length > 6000 ? context.slice(0, 6000) : context;
           parts.push(
-            `Knowledge Base Context (verbatim; cite with bracket numbers where used):\n\n${context}`
+            `Knowledge Base Context (verbatim; cite with bracket numbers where used):\n\n${trimmed}`
           );
         }
       }
@@ -66,39 +70,82 @@ export async function POST(req: NextRequest) {
     const systemMsg: Msg | undefined = parts.length
       ? { role: "system", content: parts.join("\n\n---\n\n") }
       : undefined;
-    const messages: Msg[] = systemMsg ? [systemMsg, ...history] : history;
+
+    // Compose working history (system + prior)
+    let working: Msg[] = systemMsg ? [systemMsg, ...history] : history;
 
     const client = new AzureOpenAI({ endpoint, apiKey, apiVersion });
 
+    const max_completion_tokens = Math.max(
+      1,
+      Math.min(Number(body?.maxTokens ?? 4096), 16384) // guardrails
+    );
+    const autoContinue = body?.autoContinue !== false; // default true
+    const maxSegments = 3; // 1 original + up to 2 continues
+
+    // Debug (non-stream)
     if (body?.debug) {
       const r = await client.chat.completions.create({
         model,
-        messages,
-        max_completion_tokens: 1024,
+        messages: working,
+        max_completion_tokens,
       });
       const text = r.choices?.[0]?.message?.content ?? "";
-      return new Response(JSON.stringify({ ok: true, text }), {
+      const finish = r.choices?.[0]?.finish_reason ?? "stop";
+      return new Response(JSON.stringify({ ok: true, text, finish }), {
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const completion = await client.chat.completions.create({
-      model,
-      messages,
-      stream: true,
-      max_completion_tokens: 1024,
-    });
-
+    // STREAM with optional auto-continue
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const enc = new TextEncoder();
-        try {
+        let segments = 0;
+        let finishedByLength = false;
+
+        async function runOnce(messages: Msg[]) {
+          const completion = await client.chat.completions.create({
+            model,
+            messages,
+            stream: true,
+            max_completion_tokens,
+          });
+
+          let lastFinish: string | undefined;
+
           for await (const part of completion) {
             const delta = part.choices?.[0]?.delta?.content;
             if (delta) controller.enqueue(enc.encode(delta));
+            const fr = part.choices?.[0]?.finish_reason;
+            if (fr) lastFinish = fr;
+          }
+
+          return lastFinish;
+        }
+
+        try {
+          // First pass
+          let finish = await runOnce(working);
+          segments++;
+
+          // If we hit max length and autoContinue is on, ask the model to continue
+          while (finish === "length" && autoContinue && segments < maxSegments) {
+            finishedByLength = true;
+            // Add assistant "…continued" boundary for clarity (optional)
+            controller.enqueue(enc.encode("\n\n"));
+            // Minimal nudge: append a user "continue" to keep style consistent
+            working = [...working, { role: "user", content: "Please continue." }];
+            finish = await runOnce(working);
+            segments++;
+          }
+
+          // Optionally add a boundary if we auto-continued
+          if (finishedByLength) {
+            controller.enqueue(enc.encode("\n"));
           }
         } catch (err) {
-          controller.enqueue(new TextEncoder().encode(`\n\n[Error: ${String(err)}]`));
+          controller.enqueue(enc.encode(`\n\n[Error: ${String(err)}]`));
         } finally {
           controller.close();
         }
