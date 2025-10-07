@@ -78,44 +78,6 @@ async function buildPolicySection(): Promise<string | null> {
   }
 }
 
-async function buildPolicySection(): Promise<string | null> {
-  const policy = db.profile.policy;
-  if (!policy) return null;
-
-  const metadataLines = [
-    `File name: ${policy.name}`,
-    policy.mime ? `MIME type: ${policy.mime}` : null,
-    `Size (bytes): ${policy.size}`,
-  ].filter(Boolean);
-
-  if (!policy.storedAt) {
-    return `### Customer Policy Document\n${metadataLines.join("\n")}`;
-  }
-
-  const relPath = policy.storedAt.replace(/^\/+/, "");
-  const absolutePath = path.join(process.cwd(), "public", relPath);
-
-  try {
-    const fileBuffer = await fs.readFile(absolutePath);
-    const text = fileBuffer.toString("utf-8");
-    const sanitized = text.replace(/\u0000/g, "");
-    const printable = sanitized.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
-    const ratio = sanitized.length ? printable.length / sanitized.length : 1;
-    const finalText = ratio < 0.5 ? printable : sanitized;
-    const MAX_CHARS = 8000;
-    const trimmed = finalText.length > MAX_CHARS ? finalText.slice(0, MAX_CHARS) : finalText;
-
-    if (!trimmed.trim()) {
-      return `### Customer Policy Document\n${metadataLines.join("\n")}\n\nThe uploaded policy file is not in a readable text format. Ask the customer for relevant excerpts when needed.`;
-    }
-
-    return `### Customer Policy Document\n${metadataLines.join("\n")}\n\n${trimmed}`;
-  } catch (error) {
-    console.warn("Unable to load policy document", error);
-    return `### Customer Policy Document\n${metadataLines.join("\n")}\n\nThe policy could not be loaded from disk. Ask the customer to re-upload if context is required.`;
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
