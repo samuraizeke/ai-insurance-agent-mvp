@@ -29,15 +29,17 @@ jobs:
         run: |
           rm -rf out_azure
           mkdir -p out_azure
-          # Copy standalone server (contains server.js and node runtime deps)
           cp -R .next/standalone/* out_azure/
-          # Next expects .next/static alongside server
           mkdir -p out_azure/.next
           cp -R .next/static out_azure/.next/static
-          # Public assets
           cp -R public out_azure/public
-          # If you read version/name at runtime
-          cp package.json out_azure/package.json
+          cat > out_azure/package.json <<'JSON'
+          {
+            "name": "ai-insurance-agent-mvp-standalone",
+            "private": true,
+            "scripts": { "start": "node server.js" }
+          }
+          JSON
 
       - name: Zip artifact
         run: |
