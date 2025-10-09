@@ -5,7 +5,7 @@ type Variant = "primary" | "secondary" | "outline" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center font-medium transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed select-none";
+  "inline-flex items-center justify-center font-medium transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none";
 
 const sizes: Record<Size, string> = {
   sm: "h-9 px-4 text-sm",

@@ -1,17 +1,25 @@
 "use client";
 import { useState } from "react";
 import { UploadCloud } from "lucide-react";
-import type { PolicyFile } from "@/lib/types";
+import type { PolicyFile, PolicyKind } from "@/lib/types";
 
 type Props = {
   onUploaded: (policy: PolicyFile) => void;
+  policyType: PolicyKind;
   title?: string;
   description?: string;
+  className?: string;
 };
 
 type UploadResponse = { ok: true; policy: PolicyFile } | { ok?: false; error: string };
 
-export default function FileDropzone({ onUploaded, title, description }: Props) {
+export default function FileDropzone({
+  onUploaded,
+  policyType,
+  title,
+  description,
+  className,
+}: Props) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +29,7 @@ export default function FileDropzone({ onUploaded, title, description }: Props) 
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("policyType", policyType);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data: UploadResponse = await res.json();
 
@@ -38,7 +47,7 @@ export default function FileDropzone({ onUploaded, title, description }: Props) 
 
   return (
     <div
-      className="rounded-xl border border-dashed border-[var(--color-muted)] bg-[var(--color-warm)]/40 p-4 text-sm"
+      className={`flex flex-col rounded-xl border border-dashed border-[var(--color-primary)]/35 bg-white/90 p-4 text-sm shadow-sm transition hover:border-[var(--color-primary)]/55 ${className ?? ""}`}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -46,17 +55,23 @@ export default function FileDropzone({ onUploaded, title, description }: Props) 
         if (f) void handleFile(f);
       }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="font-medium">{title ?? "Upload your policy"}</div>
-          <div className="text-[var(--color-ink-2)]">
-            {description ?? "Drag & drop or choose a file (PDF, DOCX, images)"}
-          </div>
-        </div>
+      <div className="space-y-2.5">
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-primary)]/80">
+          Upload
+        </span>
+        <h3 className="text-xl font-semibold text-gray-900">
+          {title ?? "Upload your policy"}
+        </h3>
+        <p className="text-sm text-gray-600">
+          {description ?? "Drag & drop or choose a file (PDF, DOCX, images)."}
+        </p>
+      </div>
 
+      <div className="mt-auto flex flex-col gap-2.5">
         <label
-          className="cursor-pointer rounded-xl bg-[var(--color-primary)] px-3 py-2 text-sm text-white shadow-sm transition hover:opacity-90 focus-within:outline-none focus-within:ring-2 focus-within:ring-[var(--color-primary)]/35"
+          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--color-primary)] px-3.5 py-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)] hover:text-white focus-within:outline-none focus-within:ring-2 focus-within:ring-[var(--color-primary)]/35"
           title="Upload a new policy"
+          aria-label={title ?? "Upload your policy"}
         >
           <input
             type="file"
@@ -66,15 +81,13 @@ export default function FileDropzone({ onUploaded, title, description }: Props) 
               if (f) void handleFile(f);
             }}
           />
-          <span className="pointer-events-none inline-flex items-center gap-2">
-            <UploadCloud className="h-4 w-4" aria-hidden />
-            <span>Choose file</span>
-          </span>
+          <UploadCloud className="h-5 w-5" aria-hidden />
+          <span>Choose file</span>
         </label>
-      </div>
 
-      {isUploading && <div className="mt-2 text-[var(--color-ink-2)]">Uploading…</div>}
-      {error && <div className="mt-2 text-red-600">{error}</div>}
+        {isUploading && <div className="text-[var(--color-ink-2)]">Uploading…</div>}
+        {error && <div className="text-red-600">{error}</div>}
+      </div>
     </div>
   );
 }

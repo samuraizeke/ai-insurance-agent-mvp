@@ -8,14 +8,14 @@ import HomeCard from "@/components/HomeCard";
 
 export default function HomePage() {
   return (
-    <div className="space-y-14 md:space-y-16">
+    <div className="space-y-8 md:space-y-8">
       {/* HERO */}
       <section className="relative overflow-hidden rounded-3xl border border-[var(--color-muted)] bg-white p-8 md:p-12 shadow-sm">
         <div className="mx-auto max-w-4xl text-center">
           <motion.h1
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
             className="font-display text-[clamp(2.25rem,6vw,4.25rem)] leading-[1.05] tracking-tight"
           >
             <span className="block">
@@ -27,7 +27,7 @@ export default function HomePage() {
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.5 }}
+            transition={{ delay: 0.15, duration: 0.38 }}
             className="mx-auto mt-5 max-w-2xl text-lg text-[var(--color-ink-2)]"
           >
             Get clarity on coverage, review your policy, or explore quotes—without the hold music.
@@ -36,7 +36,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.25, duration: 0.4 }}
+            transition={{ delay: 0.25, duration: 0.3 }}
             className="mt-7 flex items-center justify-center"
           >
             <Link href="/chat">
@@ -49,7 +49,7 @@ export default function HomePage() {
       </section>
 
       {/* FEATURE CARDS */}
-      <section className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
+      <section className="grid w-full gap-6 md:grid-cols-3 md:gap-7 xl:gap-8">
         <HomeCard
           accent="left"
           icon={<ShieldCheck className="h-6 w-6 text-[var(--color-primary)]" />}

@@ -1,5 +1,6 @@
 // lib/types.ts
 export type Role = "user" | "assistant" | "system";
+export type PolicyKind = "home" | "auto";
 
 export interface PolicyFile {
   id: string;
@@ -8,7 +9,11 @@ export interface PolicyFile {
   size: number;
   storedAt: string;   // file path or external URL
   uploadedAt: number; // epoch ms
+  kind?: PolicyKind;
+  textContent?: string | null;
 }
+
+export type PolicyMap = Record<PolicyKind, PolicyFile | null>;
 
 export interface ChatMessage {
   id: string;
@@ -19,10 +24,15 @@ export interface ChatMessage {
 }
 
 export interface CustomerProfile {
-  id: string;
-  name: string;
+  id: number;
+  first_name: string;
+  last_name: string;
+  birthday?: Date; // YYYY-MM-DD
   email: string;
   phone?: string;
   address?: string;
-  policy?: PolicyFile | null;
+  city: string;
+  state: string;
+  zip: string;
+  policies: PolicyMap | null;
 }

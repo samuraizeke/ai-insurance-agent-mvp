@@ -30,8 +30,16 @@ html, body, #__next { height: 100%; }
 }
 /* gradient text for "Always Available" */
 .gradient-text {
-  background: linear-gradient(90deg, var(--color-ink) 0%, var(--color-primary) 40%, var(--color-secondary) 100%);
-  background-size: 200% auto;
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    #f87254 18%,
+    #f5c16c 36%,
+    var(--color-secondary) 54%,
+    #5fd0cf 72%,
+    #9bd7e0 100%
+  );
+  background-size: 250% auto;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;

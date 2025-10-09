@@ -15,12 +15,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         className={[
           alteHaas.variable,
           leagueGothic.variable,
-          "min-h-screen antialiased app-bg", // <— global gradient background
+          "flex min-h-screen flex-col antialiased app-bg", // <— global gradient background
           "text-[var(--color-ink)] font-sans",
         ].join(" ")}
       >
         <NavBar />
-        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">{children}</main>
+        <main className="mx-auto flex w-full max-w-[min(2000px,96vw)] flex-1 flex-col overflow-hidden px-3 py-6 sm:px-4 lg:px-5">
+          {children}
+        </main>
       </body>
     </html>
   );

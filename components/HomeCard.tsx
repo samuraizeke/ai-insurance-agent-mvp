@@ -29,7 +29,7 @@ export default function HomeCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.35 }}
       transition={{ duration: 0.45 }}
-      className="relative overflow-hidden rounded-3xl border border-[var(--color-muted)] bg-white p-6 shadow-sm"
+      className="relative overflow-hidden rounded-3xl border border-[var(--color-muted)] bg-white p-6 shadow-sm sm:p-7 lg:p-8"
     >
       {/* top accent border */}
       <div

@@ -3,9 +3,9 @@ import { NextRequest } from "next/server";
 import { AzureOpenAI } from "openai";
 import { retrieveContext } from "@/lib/retriever";
 import SYSTEM_PROMPT from "@/lib/systemPrompt";
-import { db } from "@/lib/db";
-import { promises as fs } from "fs";
-import path from "path";
+import { db, ensurePolicyMap } from "@/lib/db";
+import { chunkPolicyText, loadPolicyText } from "@/lib/policyText";
+import type { PolicyFile, PolicyKind } from "@/lib/types";
 
 type Role = "system" | "user" | "assistant";
 type Msg = { role: Role; content: string };
@@ -40,42 +40,62 @@ function resolveAzure(): AzureConfig {
   return cachedAzure;
 }
 
-async function buildPolicySection(): Promise<string | null> {
-  const policy = db.profile.policy;
-  if (!policy) return null;
+function formatPolicyHeading(kind: PolicyKind) {
+  const label = kind === "home" ? "Home" : "Auto";
+  return `${label} Policy Document`;
+}
 
+async function renderPolicySection(kind: PolicyKind, policy: PolicyFile): Promise<string> {
   const metadataLines = [
     `File name: ${policy.name}`,
     policy.mime ? `MIME type: ${policy.mime}` : null,
     `Size (bytes): ${policy.size}`,
   ].filter(Boolean);
 
-  if (!policy.storedAt) {
-    return `### Customer Policy Document\n${metadataLines.join("\n")}`;
-  }
-
-  const relPath = policy.storedAt.replace(/^\/+/, "");
-  const absolutePath = path.join(process.cwd(), "public", relPath);
-
   try {
-    const fileBuffer = await fs.readFile(absolutePath);
-    const text = fileBuffer.toString("utf-8");
-    const sanitized = text.replace(/\u0000/g, "");
-    const printable = sanitized.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
-    const ratio = sanitized.length ? printable.length / sanitized.length : 1;
-    const finalText = ratio < 0.5 ? printable : sanitized;
-    const MAX_CHARS = 8000;
-    const trimmed = finalText.length > MAX_CHARS ? finalText.slice(0, MAX_CHARS) : finalText;
+    const { text } = await loadPolicyText(policy, { forceReextract: true });
+    const trimmed = text?.trim();
+    const heading = `### ${formatPolicyHeading(kind)}\n${metadataLines.join("\n")}`;
 
-    if (!trimmed.trim()) {
-      return `### Customer Policy Document\n${metadataLines.join("\n")}\n\nThe uploaded policy file is not in a readable text format. Ask the customer for relevant excerpts when needed.`;
+    if (!trimmed) {
+      return `${heading}\n\nThe uploaded policy file is not in a readable text format. Ask the customer for relevant excerpts when needed.`;
     }
 
-    return `### Customer Policy Document\n${metadataLines.join("\n")}\n\n${trimmed}`;
+    const chunks = chunkPolicyText(trimmed, 6000);
+
+    if (chunks.length === 1) {
+      return `${heading}\n\n${chunks[0]}`;
+    }
+
+    const chunkSections = chunks
+      .map((chunk, idx) => `#### Policy Segment ${idx + 1}\n${chunk}`)
+      .join("\n\n");
+
+    return `${heading}\n\n${chunkSections}`;
   } catch (error) {
-    console.warn("Unable to load policy document", error);
-    return `### Customer Policy Document\n${metadataLines.join("\n")}\n\nThe policy could not be loaded from disk. Ask the customer to re-upload if context is required.`;
+    console.warn(`Unable to load ${kind} policy document`, error);
+    return `### ${formatPolicyHeading(kind)}\n${metadataLines.join(
+      "\n"
+    )}\n\nThe policy could not be loaded from disk. Ask the customer to re-upload if context is required.`;
   }
+}
+
+async function buildPolicySection(): Promise<string | null> {
+  const sections: string[] = [];
+  const policyMap = ensurePolicyMap(db.profile);
+
+  for (const [kind, maybePolicy] of Object.entries(policyMap) as Array<
+    [PolicyKind, PolicyFile | null]
+  >) {
+    if (!maybePolicy) continue;
+    sections.push(await renderPolicySection(kind, maybePolicy));
+  }
+
+  if (!sections.length) {
+    return null;
+  }
+
+  return sections.join("\n\n---\n\n");
 }
 
 export async function POST(req: NextRequest) {
