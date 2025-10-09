@@ -10,6 +10,24 @@ import type { PolicyFile, PolicyKind } from "@/lib/types";
 type Role = "system" | "user" | "assistant";
 type Msg = { role: Role; content: string };
 
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error && typeof error.message === "string") {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+}
+
 type AzureConfig = {
   client: AzureOpenAI;
   deployment: string;
@@ -144,10 +162,10 @@ export async function POST(req: NextRequest) {
     let azure: AzureConfig;
     try {
       azure = resolveAzure();
-    } catch (configError: any) {
+    } catch (configError: unknown) {
       console.error("Azure configuration error:", configError);
       return new Response(
-        JSON.stringify({ error: configError?.message || String(configError) }),
+        JSON.stringify({ error: extractErrorMessage(configError) }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -190,9 +208,9 @@ export async function POST(req: NextRequest) {
         "Cache-Control": "no-store",
       },
     });
-  } catch (e: any) {
-    console.error("Chat route error:", e);
-    return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+  } catch (error: unknown) {
+    console.error("Chat route error:", error);
+    return new Response(JSON.stringify({ error: extractErrorMessage(error) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

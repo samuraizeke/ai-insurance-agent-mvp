@@ -71,8 +71,9 @@ export default function Chat({ initialPolicies }: ChatProps) {
     [registerUploadStatus]
   );
   useEffect(() => {
+    const timeouts = statusTimeoutsRef.current;
     return () => {
-      Object.values(statusTimeoutsRef.current).forEach((timeoutId) => {
+      Object.values(timeouts).forEach((timeoutId) => {
         if (timeoutId) {
           window.clearTimeout(timeoutId);
         }
@@ -181,7 +182,15 @@ export default function Chat({ initialPolicies }: ChatProps) {
 
       setIsStreaming(false);
     } catch (err: unknown) {
-      if ((err as any)?.name === "AbortError") return;
+      if (
+        (err instanceof Error && err.name === "AbortError") ||
+        (typeof err === "object" &&
+          err !== null &&
+          "name" in err &&
+          (err as { name?: unknown }).name === "AbortError")
+      ) {
+        return;
+      }
       const msg =
         err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
       setMessages((prev) =>

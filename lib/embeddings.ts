@@ -24,9 +24,9 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   const model  = getEmbedDeployment(); // Azure: pass the deployment name here
   const res = await client.embeddings.create({ model, input: texts });
   // Keep order by index
-  return res.data
-    .sort((a: any, b: any) => a.index - b.index)
-    .map((d: any) => d.embedding as number[]);
+  return [...res.data]
+    .sort((a, b) => a.index - b.index)
+    .map((d) => d.embedding);
 }
 
 // Very simple chunker: ~1k chars with 200 overlap
