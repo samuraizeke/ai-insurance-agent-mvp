@@ -26,9 +26,8 @@ jobs:
 
       - name: Build (Next.js standalone)
         run: npm run build
-        # Make sure next.config.js has:  module.exports = { output: 'standalone' }
+        # Ensure next.config.js has:  module.exports = { output: 'standalone' }
 
-      # Sanity check: server.js must exist after standalone build
       - name: Verify standalone bundle
         run: |
           test -f .next/standalone/server.js || (echo "Missing .next/standalone/server.js" && exit 1)
@@ -40,14 +39,15 @@ jobs:
           cp -R .next/standalone/* out_azure/
           mkdir -p out_azure/.next
           cp -R .next/static out_azure/.next/static
-          if [ -d public ]; then cp -R public out_azure/public; fi
+          if [ -d public ]; then
+            mkdir -p out_azure/public
+            cp -R public/* out_azure/public/
+          fi
+          # Build stamp (root + public)
+          echo "DEPLOY_SHA=${{ github.sha }}" | tee out_azure/.deploymeta > out_azure/public/.deploymeta
+          date -u +"DEPLOY_TIME=%Y-%m-%dT%H:%M:%SZ" | tee -a out_azure/.deploymeta >> out_azure/public/.deploymeta
 
-          # Build stamp & simple health file (handy for quick checks)
-          echo "DEPLOY_SHA=${{ github.sha }}" > out_azure/.deploymeta
-          date -u +"DEPLOY_TIME=%Y-%m-%dT%H:%M:%SZ" >> out_azure/.deploymeta
-          echo "ok" > out_azure/healthz.txt
-
-          # Minimal package.json so npm start would work if needed
+          # Minimal package.json (optional)
           cat > out_azure/package.json <<'JSON'
           {
             "name": "next-standalone-on-azure",
