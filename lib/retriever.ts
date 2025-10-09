@@ -10,6 +10,13 @@ export type RetrievedChunk = {
   chunk?: number;
 };
 
+type ChunkMetadata = {
+  text?: string;
+  source?: string;
+  title?: string;
+  chunk?: number;
+};
+
 export async function retrieveContext(query: string, topK = 6): Promise<{
   context: string;
   chunks: RetrievedChunk[];
@@ -22,14 +29,17 @@ export async function retrieveContext(query: string, topK = 6): Promise<{
     includeMetadata: true,
   });
 
-  const chunks: RetrievedChunk[] =
-    res.matches?.map((m: any) => ({
-      text: m.metadata?.text ?? "",
-      source: m.metadata?.source,
-      title: m.metadata?.title,
-      chunk: m.metadata?.chunk,
-      score: m.score,
-    })) ?? [];
+  const matches = res.matches ?? [];
+  const chunks: RetrievedChunk[] = matches.map((match) => {
+    const metadata = (match.metadata ?? {}) as ChunkMetadata;
+    return {
+      text: metadata.text ?? "",
+      source: metadata.source,
+      title: metadata.title,
+      chunk: metadata.chunk,
+      score: match.score,
+    };
+  });
 
   // Optional: sort by score desc
   chunks.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
