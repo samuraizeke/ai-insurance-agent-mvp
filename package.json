@@ -8,6 +8,9 @@
     "start": "next start",
     "ingest": "NODE_OPTIONS=\"--max-old-space-size=4096 --expose-gc\" DOTENV_CONFIG_PATH=.env.local tsx scripts/ingest.ts"
   },
+  "engines": {
+    "node": "22.x"
+  },
   "dependencies": {
     "@pinecone-database/pinecone": "^6.1.2",
     "framer-motion": "^12.23.22",
