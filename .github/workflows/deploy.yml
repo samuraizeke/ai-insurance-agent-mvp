@@ -1,8 +1,11 @@
-name: Build & Deploy to Azure App Service
+name: Build & Deploy to Azure App Service (Next.js Standalone)
 
 on:
   push:
     branches: [ main ]
+
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:
@@ -12,30 +15,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node 20
+      - name: Use Node 20 LTS
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Clean install
+      - name: Install
         run: npm ci
 
-      - name: Build (Next standalone)
+      - name: Build (Next.js standalone)
         run: npm run build
+        # Make sure next.config.js has:  module.exports = { output: 'standalone' }
 
-      # Prepare a self-contained folder for Azure
-      - name: Prepare artifact
+      # Sanity check: server.js must exist after standalone build
+      - name: Verify standalone bundle
+        run: |
+          test -f .next/standalone/server.js || (echo "Missing .next/standalone/server.js" && exit 1)
+
+      - name: Prepare artifact for Azure
         run: |
           rm -rf out_azure
           mkdir -p out_azure
           cp -R .next/standalone/* out_azure/
           mkdir -p out_azure/.next
           cp -R .next/static out_azure/.next/static
-          cp -R public out_azure/public
+          if [ -d public ]; then cp -R public out_azure/public; fi
+
+          # Build stamp & simple health file (handy for quick checks)
+          echo "DEPLOY_SHA=${{ github.sha }}" > out_azure/.deploymeta
+          date -u +"DEPLOY_TIME=%Y-%m-%dT%H:%M:%SZ" >> out_azure/.deploymeta
+          echo "ok" > out_azure/healthz.txt
+
+          # Minimal package.json so npm start would work if needed
           cat > out_azure/package.json <<'JSON'
           {
-            "name": "ai-insurance-agent-mvp-standalone",
+            "name": "next-standalone-on-azure",
             "private": true,
             "scripts": { "start": "node server.js" }
           }
@@ -47,8 +62,7 @@ jobs:
           zip -r ../app.zip .
           cd ..
 
-      # Deploy using Publish Profile (App Service)
-      - name: Deploy to Azure Web App
+      - name: Deploy to Azure Web App (Run-From-Package)
         uses: azure/webapps-deploy@v3
         with:
           app-name: ai-insurance-agent-mvp
