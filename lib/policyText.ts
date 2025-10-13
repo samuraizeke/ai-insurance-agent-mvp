@@ -4,7 +4,8 @@ import { createRequire } from "node:module";
 import type { PolicyFile } from "@/lib/types";
 
 const require = createRequire(import.meta.url);
-type PdfParseFn = (data: Buffer | Uint8Array) => Promise<{ text?: string }>;
+type PdfParseModule = typeof import("pdf-parse");
+type PdfParserInstance = InstanceType<PdfParseModule["PDFParse"]>;
 
 export type ExtractedPolicyText = {
   text: string | null;
@@ -72,13 +73,24 @@ export async function extractTextFromFile(
   let raw = "";
 
   if (mimeLower.includes("pdf") || ext === ".pdf") {
+    let parser: PdfParserInstance | null = null;
+
     try {
-      const parse = require("pdf-parse") as PdfParseFn;
-      const parsed = await parse(buffer);
+      const { PDFParse } = require("pdf-parse") as PdfParseModule;
+      parser = new PDFParse({ data: buffer });
+      const parsed = await parser.getText();
       raw = typeof parsed?.text === "string" ? parsed.text : "";
     } catch (error) {
       console.warn("Failed to parse PDF document", error);
       raw = "";
+    } finally {
+      if (parser) {
+        try {
+          await parser.destroy();
+        } catch (cleanupError) {
+          console.warn("Failed to destroy PDF parser instance", cleanupError);
+        }
+      }
     }
   } else if (mimeLower.startsWith("text/") || ext === ".txt" || ext === ".md") {
     raw = buffer.toString("utf-8");

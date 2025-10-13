@@ -71,7 +71,7 @@ async function renderPolicySection(kind: PolicyKind, policy: PolicyFile): Promis
   ].filter(Boolean);
 
   try {
-    const { text } = await loadPolicyText(policy, { forceReextract: true });
+    const { text } = await loadPolicyText(policy);
     const trimmed = text?.trim();
     const heading = `### ${formatPolicyHeading(kind)}\n${metadataLines.join("\n")}`;
 
@@ -99,20 +99,21 @@ async function renderPolicySection(kind: PolicyKind, policy: PolicyFile): Promis
 }
 
 async function buildPolicySection(): Promise<string | null> {
-  const sections: string[] = [];
   const policyMap = ensurePolicyMap(db.profile);
+  const renderTasks: Array<Promise<string>> = [];
 
   for (const [kind, maybePolicy] of Object.entries(policyMap) as Array<
     [PolicyKind, PolicyFile | null]
   >) {
     if (!maybePolicy) continue;
-    sections.push(await renderPolicySection(kind, maybePolicy));
+    renderTasks.push(renderPolicySection(kind, maybePolicy));
   }
 
-  if (!sections.length) {
+  if (!renderTasks.length) {
     return null;
   }
 
+  const sections = await Promise.all(renderTasks);
   return sections.join("\n\n---\n\n");
 }
 
@@ -143,16 +144,20 @@ export async function POST(req: NextRequest) {
 
     const useRag = body.useRag !== false;
     const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-    if (useRag && lastUser?.content) {
-      const { context } = await retrieveContext(lastUser.content, 6);
-      if (context) {
-        sections.push(
-          `### Knowledge Base Context (verbatim; cite with bracket numbers)\n${context}`
-        );
-      }
+
+    const contextPromise = useRag && lastUser?.content
+      ? retrieveContext(lastUser.content, 6).then((res) => res.context)
+      : Promise.resolve("");
+    const policyPromise = buildPolicySection();
+
+    const [context, policySection] = await Promise.all([contextPromise, policyPromise]);
+
+    if (context) {
+      sections.push(
+        `### Knowledge Base Context (verbatim; cite with bracket numbers)\n${context}`
+      );
     }
 
-    const policySection = await buildPolicySection();
     if (policySection) {
       sections.push(policySection);
     }

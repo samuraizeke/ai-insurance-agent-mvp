@@ -6,6 +6,9 @@ import { Download, Eye, Loader2, Send } from "lucide-react";
 import FileDropzone from "@/components/FileDropzone";
 import { fmt } from "@/lib/utils";
 import type { PolicyFile, PolicyKind, PolicyMap } from "@/lib/types";
+import { db } from "@/lib/db";
+
+const firstLetter = (db.profile.first_name || "U").charAt(0).toUpperCase();
 
 type Role = "user" | "assistant" | "system";
 type ChatMsg = { id: string; role: Role; content: string; createdAt: number };
@@ -13,6 +16,8 @@ type ChatMsg = { id: string; role: Role; content: string; createdAt: number };
 type ChatProps = {
   initialPolicies?: Partial<PolicyMap>;
 };
+
+type StatusIntent = "success" | "error";
 
 const POLICY_LABELS: Record<PolicyKind, string> = {
   home: "Home Policy",
@@ -27,9 +32,13 @@ export default function Chat({ initialPolicies }: ChatProps) {
     home: initialPolicies?.home ?? null,
     auto: initialPolicies?.auto ?? null,
   });
-  const [uploadStatus, setUploadStatus] = useState<
-    Record<PolicyKind, { id: string; message: string } | null>
+  const [policyStatus, setPolicyStatus] = useState<
+    Record<PolicyKind, { id: string; message: string; intent: StatusIntent } | null>
   >({ home: null, auto: null });
+  const [isRemoving, setIsRemoving] = useState<Record<PolicyKind, boolean>>({
+    home: false,
+    auto: false,
+  });
   const abortRef = useRef<AbortController | null>(null);
   const latestAssistantIdRef = useRef<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -39,26 +48,29 @@ export default function Chat({ initialPolicies }: ChatProps) {
     auto: null,
   });
 
-  const registerUploadStatus = useCallback((kind: PolicyKind, message: string) => {
-    const id = crypto.randomUUID();
+  const registerPolicyStatus = useCallback(
+    (kind: PolicyKind, message: string, intent: StatusIntent = "success") => {
+      const id = crypto.randomUUID();
 
-    setUploadStatus((prev) => ({ ...prev, [kind]: { id, message } }));
+      setPolicyStatus((prev) => ({ ...prev, [kind]: { id, message, intent } }));
 
-    const existingTimeout = statusTimeoutsRef.current[kind];
-    if (existingTimeout) {
-      window.clearTimeout(existingTimeout);
-    }
+      const existingTimeout = statusTimeoutsRef.current[kind];
+      if (existingTimeout) {
+        window.clearTimeout(existingTimeout);
+      }
 
-    const timeoutId = window.setTimeout(() => {
-      setUploadStatus((prev) => {
-        if (prev[kind]?.id !== id) return prev;
-        return { ...prev, [kind]: null };
-      });
-      statusTimeoutsRef.current[kind] = null;
-    }, 5000);
+      const timeoutId = window.setTimeout(() => {
+        setPolicyStatus((prev) => {
+          if (prev[kind]?.id !== id) return prev;
+          return { ...prev, [kind]: null };
+        });
+        statusTimeoutsRef.current[kind] = null;
+      }, 5000);
 
-    statusTimeoutsRef.current[kind] = timeoutId;
-  }, []);
+      statusTimeoutsRef.current[kind] = timeoutId;
+    },
+    []
+  );
 
   const handlePolicyUpload = useCallback(
     (kind: PolicyKind) => (uploaded: PolicyFile) => {
@@ -66,9 +78,45 @@ export default function Chat({ initialPolicies }: ChatProps) {
       setPolicies((prev) => ({ ...prev, [resolvedKind]: uploaded }));
 
       const label = POLICY_LABELS[resolvedKind];
-      registerUploadStatus(resolvedKind, `${label} “${uploaded.name}” saved to your profile.`);
+      registerPolicyStatus(
+        resolvedKind,
+        `${label} “${uploaded.name}” saved to your profile.`
+      );
     },
-    [registerUploadStatus]
+    [registerPolicyStatus]
+  );
+  const handlePolicyRemove = useCallback(
+    async (kind: PolicyKind) => {
+      const label = POLICY_LABELS[kind].toLowerCase();
+      const confirmed = window.confirm(`Remove this ${label} from your profile?`);
+      if (!confirmed) return;
+
+      setIsRemoving((prev) => ({ ...prev, [kind]: true }));
+      setPolicyStatus((prev) => ({ ...prev, [kind]: null }));
+
+      try {
+        const res = await fetch("/api/policy", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ policyType: kind }),
+        });
+
+        if (!res.ok) {
+          const errText = await safeJsonError(res);
+          throw new Error(errText);
+        }
+
+        setPolicies((prev) => ({ ...prev, [kind]: null }));
+        registerPolicyStatus(kind, `${POLICY_LABELS[kind]} removed from your profile.`);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+        registerPolicyStatus(kind, `Failed to remove policy: ${message}`, "error");
+      } finally {
+        setIsRemoving((prev) => ({ ...prev, [kind]: false }));
+      }
+    },
+    [registerPolicyStatus]
   );
   useEffect(() => {
     const timeouts = statusTimeoutsRef.current;
@@ -212,7 +260,8 @@ export default function Chat({ initialPolicies }: ChatProps) {
 
   const renderPolicyCard = (kind: PolicyKind) => {
     const policy = policies[kind];
-    const status = uploadStatus[kind];
+    const status = policyStatus[kind];
+    const removing = isRemoving[kind];
     const label = POLICY_LABELS[kind];
 
     const description = policy
@@ -293,6 +342,21 @@ export default function Chat({ initialPolicies }: ChatProps) {
                   <Download className="h-4 w-4" aria-hidden />
                   Download
                 </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handlePolicyRemove(kind);
+                  }}
+                  disabled={removing}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3.5 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  title={`Remove ${label.toLowerCase()}`}
+                  aria-label={`Remove ${label.toLowerCase()}`}
+                >
+                  {removing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : null}
+                  {removing ? "Removing…" : "Remove policy"}
+                </button>
               </div>
             ) : null}
           </div>
@@ -311,7 +375,13 @@ export default function Chat({ initialPolicies }: ChatProps) {
         />
 
         {status ? (
-          <div className="rounded-lg border border-green-100 bg-green-50/80 px-3 py-2 text-xs text-green-700">
+          <div
+            className={`rounded-lg border px-3 py-2 text-xs ${
+              status.intent === "error"
+                ? "border-red-100 bg-red-50/80 text-red-700"
+                : "border-green-100 bg-green-50/80 text-green-700"
+            }`}
+          >
             {status.message}
           </div>
         ) : null}
@@ -401,7 +471,7 @@ function MessageBubble({ msg }: { msg: ChatMsg }) {
           style={isUser ? { backgroundColor: "var(--color-secondary)" } : {}}
           aria-hidden
         >
-          {isUser ? "U" : "Sam"}
+          {isUser ? firstLetter : "Sam"}
         </span>
 
         {/* Bubble */}
