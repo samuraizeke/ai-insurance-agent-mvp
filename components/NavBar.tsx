@@ -9,13 +9,14 @@ export default function NavBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--color-muted)] bg-[color:hsla(0,0%,100%,.7)] backdrop-blur supports-[backdrop-filter]:bg-[color:hsla(0,0%,100%,.55)]">
       <div className="mx-auto flex w-full max-w-[min(2000px,96vw)] items-center justify-between px-3 py-3 sm:px-4">
-        <div className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="logo" width={28} height={28} />
+        <div className="flex items-center">
+          <Link href={"/"} className="mr-1">
+            <Image src="/Samurai_Insurance_Logo.svg" alt="logo" width={24} height={24} />
+          </Link>
           <Link
             href="/"
             className="rounded-sm px-1 font-display text-xl font-medium tracking-tight text-[var(--color-foreground)] transition-colors hover:text-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-          >
-            {appName}
+          >{appName}
           </Link>
         </div>
         <nav className="flex items-center gap-2 text-sm">
