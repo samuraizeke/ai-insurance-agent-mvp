@@ -4,7 +4,7 @@ import NavBar from "@/components/NavBar";
 import { alteHaas, leagueGothic } from "./fonts";
 
 export const metadata = {
-  title: process.env.NEXT_PUBLIC_APP_NAME || "AI Insurance Agent",
+  title: process.env.NEXT_PUBLIC_APP_NAME || "Samurai Insurance",
   description: "Chat with an AI agent about P&C coverage",
 };
 
