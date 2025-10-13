@@ -3,9 +3,46 @@ import path from "path";
 import { createRequire } from "node:module";
 import type { PolicyFile } from "@/lib/types";
 
-const require = createRequire(import.meta.url);
 type PdfParseModule = typeof import("pdf-parse");
 type PdfParserInstance = InstanceType<PdfParseModule["PDFParse"]>;
+
+let pdfModulePromise: Promise<PdfParseModule> | null = null;
+const nodeRequire = typeof createRequire === "function" ? createRequire(import.meta.url) : null;
+
+async function loadPdfParseModule(): Promise<PdfParseModule> {
+  if (!pdfModulePromise) {
+    pdfModulePromise = (async () => {
+      let lastError: unknown = null;
+
+      if (nodeRequire) {
+        try {
+          return nodeRequire("pdf-parse") as PdfParseModule;
+        } catch (requireError) {
+          lastError = requireError;
+        }
+      }
+
+      try {
+        return (await import("pdf-parse")) as PdfParseModule;
+      } catch (dynamicError) {
+        if (lastError) {
+          const message = "Unable to load pdf-parse via require or dynamic import.";
+          throw new Error(message, { cause: { requireError: lastError, dynamicError } });
+        }
+        throw dynamicError;
+      }
+    })();
+
+    try {
+      await pdfModulePromise;
+    } catch (error) {
+      pdfModulePromise = null;
+      throw error;
+    }
+  }
+
+  return pdfModulePromise;
+}
 
 export type ExtractedPolicyText = {
   text: string | null;
@@ -76,7 +113,7 @@ export async function extractTextFromFile(
     let parser: PdfParserInstance | null = null;
 
     try {
-      const { PDFParse } = require("pdf-parse") as PdfParseModule;
+      const { PDFParse } = await loadPdfParseModule();
       parser = new PDFParse({ data: buffer });
       const parsed = await parser.getText();
       raw = typeof parsed?.text === "string" ? parsed.text : "";

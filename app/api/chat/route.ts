@@ -7,6 +7,8 @@ import { db, ensurePolicyMap } from "@/lib/db";
 import { chunkPolicyText, loadPolicyText } from "@/lib/policyText";
 import type { PolicyFile, PolicyKind } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 type Role = "system" | "user" | "assistant";
 type Msg = { role: Role; content: string };
 
