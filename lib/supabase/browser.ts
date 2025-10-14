@@ -1,6 +1,7 @@
 "use client";
 
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { getSupabaseConfig } from "@/lib/supabase/env";
 
 export type BrowserSupabaseClient = ReturnType<typeof createClientComponentClient>;
 
@@ -8,14 +9,7 @@ let client: BrowserSupabaseClient | null = null;
 
 export function getSupabaseBrowserClient(): BrowserSupabaseClient {
   if (!client) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !anonKey) {
-      throw new Error(
-        "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-      );
-    }
+    const { url, anonKey } = getSupabaseConfig();
 
     client = createClientComponentClient({
       supabaseUrl: url,
