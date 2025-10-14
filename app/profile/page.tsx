@@ -1,16 +1,27 @@
-import { db, ensurePolicyMap } from "@/lib/db";
+import { redirect } from "next/navigation";
+import { ensureProfile } from "@/lib/profile";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { PolicyFile, PolicyKind } from "@/lib/types";
 import { fmt } from "@/lib/utils";
-import type { PolicyKind, PolicyFile } from "@/lib/types";
 
 const POLICY_LABELS: Record<PolicyKind, string> = {
   home: "Home Policy",
   auto: "Auto Policy",
 };
 
-export default function ProfilePage() {
-  const p = db.profile;
-  const policyMap = ensurePolicyMap(p);
-  const fullName = `${p.first_name} ${p.last_name}`.trim();
+export default async function ProfilePage() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  const profile = await ensureProfile(supabase, user);
+  const policyMap = profile.policies ?? { home: null, auto: null };
+  const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "—";
 
   return (
     <div className="flex flex-col gap-6">
@@ -25,15 +36,15 @@ export default function ProfilePage() {
         <h2 className="mb-2 text-lg font-medium">Personal Info</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Name" value={fullName} />
-          <Field label="Email" value={p.email} />
-          <Field label="Phone" value={p.phone || "—"} />
+          <Field label="Email" value={profile.email} />
+          <Field label="Phone" value={profile.phone || "—"} />
           <Field
             label="Address"
             value={
-              p.address
-                ? `${p.address}${p.city ? `, ${p.city}` : ""}${
-                    p.state ? `, ${p.state}` : ""
-                  }${p.zip ? ` ${p.zip}` : ""}`
+              profile.address
+                ? `${profile.address}${profile.city ? `, ${profile.city}` : ""}${
+                    profile.state ? `, ${profile.state}` : ""
+                  }${profile.zip ? ` ${profile.zip}` : ""}`
                 : "—"
             }
           />

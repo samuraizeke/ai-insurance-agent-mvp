@@ -3,9 +3,10 @@ import { NextRequest } from "next/server";
 import { AzureOpenAI } from "openai";
 import { retrieveContext } from "@/lib/retriever";
 import SYSTEM_PROMPT from "@/lib/systemPrompt";
-import { db, ensurePolicyMap } from "@/lib/db";
+import { ensureProfile } from "@/lib/profile";
+import { createSupabaseRouteClient } from "@/lib/supabase/server";
 import { chunkPolicyText, loadPolicyText } from "@/lib/policyText";
-import type { PolicyFile, PolicyKind } from "@/lib/types";
+import type { PolicyFile, PolicyKind, PolicyMap } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -100,8 +101,11 @@ async function renderPolicySection(kind: PolicyKind, policy: PolicyFile): Promis
   }
 }
 
-async function buildPolicySection(): Promise<string | null> {
-  const policyMap = ensurePolicyMap(db.profile);
+async function buildPolicySection(policyMap: PolicyMap | null): Promise<string | null> {
+  if (!policyMap) {
+    return null;
+  }
+
   const renderTasks: Array<Promise<string>> = [];
 
   for (const [kind, maybePolicy] of Object.entries(policyMap) as Array<
@@ -121,6 +125,19 @@ async function buildPolicySection(): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createSupabaseRouteClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const body = (await req.json()) as {
       messages: Msg[];
       useRag?: boolean;
@@ -147,10 +164,14 @@ export async function POST(req: NextRequest) {
     const useRag = body.useRag !== false;
     const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
 
-    const contextPromise = useRag && lastUser?.content
-      ? retrieveContext(lastUser.content, 6).then((res) => res.context)
-      : Promise.resolve("");
-    const policyPromise = buildPolicySection();
+    const contextPromise =
+      useRag && lastUser?.content
+        ? retrieveContext(lastUser.content, 6).then((res) => res.context)
+        : Promise.resolve("");
+    const profilePromise = ensureProfile(supabase, user);
+    const policyPromise = profilePromise.then((profile) =>
+      buildPolicySection(profile.policies ?? null)
+    );
 
     const [context, policySection] = await Promise.all([contextPromise, policyPromise]);
 

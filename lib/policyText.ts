@@ -78,12 +78,12 @@ export async function loadPolicyText(
   const needsFresh = shouldForce || !text || text.length < minLength;
 
   if (needsFresh) {
-    text = await extractTextFromFile(absolutePath, policy.mime, { maxChars });
+    text = await extractTextFromFile(absolutePath, policy.mime ?? undefined, { maxChars });
   }
 
   if (!text) {
     // One final attempt without limiting characters.
-    text = await extractTextFromFile(absolutePath, policy.mime);
+    text = await extractTextFromFile(absolutePath, policy.mime ?? undefined);
   }
 
   if (text && maxChars && text.length > maxChars) {

@@ -1,8 +1,9 @@
 // app/api/policy/route.ts
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { db, ensurePolicyMap } from "@/lib/db";
+import { loadCustomerProfile } from "@/lib/profile";
+import { createSupabaseRouteClient } from "@/lib/supabase/server";
 import type { PolicyKind } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -12,28 +13,46 @@ const isPolicyKind = (value: unknown): value is PolicyKind =>
 
 export async function DELETE(req: NextRequest) {
   try {
+    const supabase = await createSupabaseRouteClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const profile = await loadCustomerProfile(supabase, user.email ?? null);
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+
     const body = await req.json().catch(() => null);
     const policyType = body?.policyType;
 
     if (!isPolicyKind(policyType)) {
-      return new Response(JSON.stringify({ error: "Invalid policy type" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Invalid policy type" }, { status: 400 });
     }
 
-    const policies = ensurePolicyMap(db.profile);
-    const policy = policies[policyType];
+    const { data: policy, error } = await supabase
+      .from("policies")
+      .select("id, stored_at")
+      .eq("profile_id", profile.id)
+      .eq("kind", policyType)
+      .maybeSingle();
+
+    if (error && error.code !== "PGRST116") {
+      console.error("Failed to load policy for deletion", error);
+      return NextResponse.json({ error: "Failed to load policy" }, { status: 500 });
+    }
 
     if (!policy) {
-      return new Response(JSON.stringify({ error: "Policy not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Policy not found" }, { status: 404 });
     }
 
-    if (policy.storedAt?.startsWith("/uploads/")) {
-      const relativePath = policy.storedAt.replace(/^\/+/, "");
+    if (policy.stored_at?.startsWith("/uploads/")) {
+      const relativePath = policy.stored_at.replace(/^\/+/, "");
       const resolvedPath = path.join(process.cwd(), "public", relativePath);
 
       try {
@@ -46,17 +65,16 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    policies[policyType] = null;
+    const { error: deleteError } = await supabase.from("policies").delete().eq("id", policy.id);
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    if (deleteError) {
+      console.error("Failed to delete policy row", deleteError);
+      return NextResponse.json({ error: "Failed to delete policy" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to remove policy";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -3,14 +3,15 @@ export type Role = "user" | "assistant" | "system";
 export type PolicyKind = "home" | "auto";
 
 export interface PolicyFile {
-  id: string;
+  id: number;
   name: string;
-  mime: string;
+  mime: string | null;
   size: number;
-  storedAt: string;   // file path or external URL
+  storedAt: string; // file path or external URL
   uploadedAt: number; // epoch ms
-  kind?: PolicyKind;
+  kind: PolicyKind;
   textContent?: string | null;
+  profileId: number;
 }
 
 export type PolicyMap = Record<PolicyKind, PolicyFile | null>;
@@ -25,14 +26,14 @@ export interface ChatMessage {
 
 export interface CustomerProfile {
   id: number;
-  first_name: string;
-  last_name: string;
-  birthday?: Date; // YYYY-MM-DD
+  first_name: string | null;
+  last_name: string | null;
+  birthday?: string | null;
   email: string;
-  phone?: string;
-  address?: string;
-  city: string;
-  state: string;
-  zip: string;
-  policies: PolicyMap | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  policies?: PolicyMap | null;
 }

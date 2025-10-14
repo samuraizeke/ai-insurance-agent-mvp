@@ -6,15 +6,13 @@ import { Download, Eye, Loader2, Send } from "lucide-react";
 import FileDropzone from "@/components/FileDropzone";
 import { fmt } from "@/lib/utils";
 import type { PolicyFile, PolicyKind, PolicyMap } from "@/lib/types";
-import { db } from "@/lib/db";
-
-const firstLetter = (db.profile.first_name || "U").charAt(0).toUpperCase();
 
 type Role = "user" | "assistant" | "system";
 type ChatMsg = { id: string; role: Role; content: string; createdAt: number };
 
 type ChatProps = {
   initialPolicies?: Partial<PolicyMap>;
+  userInitial: string;
 };
 
 type StatusIntent = "success" | "error";
@@ -24,7 +22,7 @@ const POLICY_LABELS: Record<PolicyKind, string> = {
   auto: "Auto Policy",
 };
 
-export default function Chat({ initialPolicies }: ChatProps) {
+export default function Chat({ initialPolicies, userInitial }: ChatProps) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -401,7 +399,7 @@ export default function Chat({ initialPolicies }: ChatProps) {
           ) : (
             <ul className="space-y-3">
               {messages.map((m) => (
-                <MessageBubble key={m.id} msg={m} />
+                <MessageBubble key={m.id} msg={m} userInitial={userInitial} />
               ))}
             </ul>
           )}
@@ -446,7 +444,7 @@ export default function Chat({ initialPolicies }: ChatProps) {
   );
 }
 
-function MessageBubble({ msg }: { msg: ChatMsg }) {
+function MessageBubble({ msg, userInitial }: { msg: ChatMsg; userInitial: string }) {
   const isUser = msg.role === "user";
   const isAssistant = msg.role === "assistant";
   const trimmedContent = msg.content.trim();
@@ -471,7 +469,7 @@ function MessageBubble({ msg }: { msg: ChatMsg }) {
           style={isUser ? { backgroundColor: "var(--color-secondary)" } : {}}
           aria-hidden
         >
-          {isUser ? firstLetter : "Sam"}
+          {isUser ? userInitial : "Sam"}
         </span>
 
         {/* Bubble */}

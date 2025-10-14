@@ -7,10 +7,12 @@ import type { PolicyMap } from "@/lib/types";
 type ChatPageClientProps = {
   firstName: string;
   initialPolicies: Partial<PolicyMap>;
+  userInitial: string;
 };
 
 export default function ChatPageClient({
   firstName,
+  userInitial,
   initialPolicies,
 }: ChatPageClientProps) {
   return (
@@ -40,6 +42,7 @@ export default function ChatPageClient({
           className="relative flex flex-1 min-h-0 overflow-hidden"
         >
           <Chat
+            userInitial={userInitial}
             initialPolicies={{
               home: initialPolicies.home ?? null,
               auto: initialPolicies.auto ?? null,
