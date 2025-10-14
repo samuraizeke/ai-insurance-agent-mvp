@@ -3,15 +3,26 @@ type SupabaseConfig = {
   anonKey: string;
 };
 
+const STATIC_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const STATIC_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 const URL_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL", "SUPABASE_PROJECT_URL"] as const;
 const ANON_KEY_KEYS = ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY"] as const;
 
 export function getSupabaseConfig(): SupabaseConfig {
+  if (typeof window !== "undefined") {
+    if (!STATIC_URL || !STATIC_ANON_KEY) {
+      throw new Error(
+        "Supabase configuration missing on the client. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are defined at build time."
+      );
+    }
+    return { url: STATIC_URL, anonKey: STATIC_ANON_KEY };
+  }
+
   const resolvedUrl = resolveFirst(URL_KEYS);
   const resolvedAnonKey = resolveFirst(ANON_KEY_KEYS);
-
-  const url = resolvedUrl?.value ?? "";
-  const anonKey = resolvedAnonKey?.value ?? "";
+  const url = resolvedUrl?.value ?? STATIC_URL ?? "";
+  const anonKey = resolvedAnonKey?.value ?? STATIC_ANON_KEY ?? "";
 
   if (!url || !anonKey) {
     const missingParts = [
