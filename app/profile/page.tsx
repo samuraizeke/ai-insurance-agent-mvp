@@ -10,7 +10,7 @@ const POLICY_LABELS: Record<PolicyKind, string> = {
 };
 
 export default async function ProfilePage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

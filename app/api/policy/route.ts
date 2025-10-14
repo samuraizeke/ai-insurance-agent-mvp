@@ -13,7 +13,7 @@ const isPolicyKind = (value: unknown): value is PolicyKind =>
 
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = await createSupabaseRouteClient();
+    const supabase = createSupabaseRouteClient();
     const {
       data: { user },
       error: authError,

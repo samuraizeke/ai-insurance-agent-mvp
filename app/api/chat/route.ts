@@ -125,7 +125,7 @@ async function buildPolicySection(policyMap: PolicyMap | null): Promise<string |
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createSupabaseRouteClient();
+    const supabase = createSupabaseRouteClient();
     const {
       data: { user },
       error: authError,

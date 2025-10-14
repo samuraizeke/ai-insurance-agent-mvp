@@ -4,7 +4,7 @@ import { ensureProfile } from "@/lib/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function ChatPage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
