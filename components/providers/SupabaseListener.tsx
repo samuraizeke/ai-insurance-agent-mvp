@@ -2,14 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useSupabase } from "@/components/providers/SupabaseProvider";
 
 export function SupabaseListener({ accessToken }: { accessToken: string | null }) {
   const router = useRouter();
+  const { supabase } = useSupabase();
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -21,7 +20,7 @@ export function SupabaseListener({ accessToken }: { accessToken: string | null }
     return () => {
       subscription.unsubscribe();
     };
-  }, [accessToken, router]);
+  }, [accessToken, router, supabase]);
 
   return null;
 }

@@ -4,6 +4,7 @@ import NavBar from "@/components/NavBar";
 import { SupabaseProvider } from "@/components/providers/SupabaseProvider";
 import { SupabaseListener } from "@/components/providers/SupabaseListener";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseConfig } from "@/lib/supabase/env";
 import { alteHaas, leagueGothic } from "./fonts";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
+  const supabaseConfig = getSupabaseConfig();
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -32,7 +34,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           "text-[var(--color-ink)] font-sans",
         ].join(" ")}
       >
-        <SupabaseProvider session={session} user={user}>
+        <SupabaseProvider session={session} user={user} supabaseConfig={supabaseConfig}>
           <SupabaseListener accessToken={session?.access_token ?? null} />
           <NavBar />
           <main className="mx-auto flex w-full max-w-[min(2000px,96vw)] flex-1 flex-col overflow-hidden px-3 py-6 sm:px-4 lg:px-5">

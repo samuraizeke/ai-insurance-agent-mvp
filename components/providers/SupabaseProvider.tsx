@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { type Session, type User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, type BrowserSupabaseClient } from "@/lib/supabase/browser";
+import type { SupabaseConfig } from "@/lib/supabase/env";
 
 type SupabaseContextValue = {
   supabase: BrowserSupabaseClient;
@@ -16,12 +17,14 @@ export function SupabaseProvider({
   children,
   session,
   user,
+  supabaseConfig,
 }: {
   children: ReactNode;
   session: Session | null;
   user: User | null;
+  supabaseConfig: SupabaseConfig;
 }) {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const supabase = useMemo(() => getSupabaseBrowserClient(supabaseConfig), [supabaseConfig]);
   const [currentSession, setCurrentSession] = useState<Session | null>(session);
   const [currentUser, setCurrentUser] = useState<User | null>(user);
 
