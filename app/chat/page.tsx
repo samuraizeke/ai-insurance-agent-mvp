@@ -3,6 +3,8 @@ import ChatPageClient from "@/components/ChatPageClient";
 import { ensureProfile } from "@/lib/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function ChatPage() {
   const supabase = createSupabaseServerClient();
   const {

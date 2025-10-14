@@ -9,6 +9,8 @@ const POLICY_LABELS: Record<PolicyKind, string> = {
   auto: "Auto Policy",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ProfilePage() {
   const supabase = createSupabaseServerClient();
   const {

@@ -6,6 +6,8 @@ import { SupabaseListener } from "@/components/providers/SupabaseListener";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { alteHaas, leagueGothic } from "./fonts";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: process.env.NEXT_PUBLIC_APP_NAME || "Samurai Insurance",
   description: "Chat with an AI agent about P&C coverage",
